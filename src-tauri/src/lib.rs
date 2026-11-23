@@ -39,6 +39,13 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+fn reload_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval("window.location.reload()");
+        show_main_window(app);
+    }
+}
+
 fn show_update_dialog(app: &tauri::AppHandle, title: &str, body: &str) {
     app.dialog()
         .message(body)
@@ -125,12 +132,24 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
-         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let open_item =
                 MenuItem::with_id(app, "open", "Open Voxly", true, None::<&str>)?;
+            let messages_item = MenuItem::with_id(app, "messages", "Open Messages", true, None::<&str>)?;
+            let calls_item = MenuItem::with_id(app, "calls", "Open Calls", true, None::<&str>)?;
+            let groups_item = MenuItem::with_id(app, "groups", "Open Groups", true, None::<&str>)?;
+            let unread_item = MenuItem::with_id(app, "unread_count", "Unread: 0", false, None::<&str>)?;
+            let reload_item = MenuItem::with_id(app, "reload", "Reload Voxly", true, None::<&str>)?;
+            let test_notification_item = MenuItem::with_id(
+                app,
+                "test_notification",
+                "Send Test Notification",
+                true,
+                None::<&str>,
+            )?;
             let updates_item = MenuItem::with_id(
                 app,
                 "check_updates",
@@ -138,14 +157,20 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
-            let messages_item = MenuItem::with_id(app, "messages", "Open Messages", true, None::<&str>)?;
-            let calls_item = MenuItem::with_id(app, "calls", "Open Calls", true, None::<&str>)?;
-            let groups_item = MenuItem::with_id(app, "groups", "Open Groups", true, None::<&str>)?;
-            let unread_item = MenuItem::with_id(app, "unread_count", "Unread: 0", false, None::<&str>)?;
             app.manage(UnreadMenuItem(unread_item.clone()));
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit Voxly", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_item, &messages_item, &calls_item, &groups_item, &unread_item, &updates_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[
+                &open_item,
+                &messages_item,
+                &calls_item,
+                &groups_item,
+                &unread_item,
+                &reload_item,
+                &test_notification_item,
+                &updates_item,
+                &quit_item,
+            ])?;
 
             let icon = app
                 .default_window_icon()
@@ -162,6 +187,12 @@ pub fn run() {
                     "messages" => open_route(app, "/chat"),
                     "calls" => open_route(app, "/call"),
                     "groups" => open_route(app, "/dashboard?view=groups"),
+                    "reload" => reload_main_window(app),
+                    "test_notification" => notify(
+                        app,
+                        "Voxly test notification",
+                        "Desktop notifications are working.",
+                    ),
                     "check_updates" => spawn_update_check(app, true),
                     "quit" => app.exit(0),
                     _ => {}

@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Keep only the newest validation run for a PR or branch.
+concurrency:
+  group: voxly-desktop-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows:
     name: Build Windows NSIS installer

@@ -47,12 +47,8 @@ async fn check_and_install_update(
             || println!("Voxly update download finished"),
         )
         .await?;
-
-    // On Windows, installing an NSIS update closes the running process.
-    // restart() relaunches the newly installed version.
+    // On Windows, the updater closes the running process and restarts it.
     app.restart();
-
-    Ok(())
 }
 
 pub fn run() {

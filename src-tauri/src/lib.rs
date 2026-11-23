@@ -23,7 +23,11 @@ fn set_unread_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
 
 fn main_window_is_visible(app: &tauri::AppHandle) -> bool {
     app.get_webview_window("main")
-        .and_then(|window| window.is_visible().ok())
+        .map(|window| {
+            let visible = window.is_visible().unwrap_or(true);
+            let minimized = window.is_minimized().unwrap_or(false);
+            visible && !minimized
+        })
         .unwrap_or(true)
 }
 
@@ -171,11 +175,11 @@ pub fn run() {
                     && url.port().is_none()
             }).unwrap_or(false);
 
+            // Do not silently grant microphone or camera access. Returning
+            // Default lets WebView2 show its normal permission prompt and
+            // remember the user's choice for this origin.
             let response = if trusted_origin {
-                match kind {
-                    PermissionKind::Microphone | PermissionKind::Camera => PermissionResponse::Allow,
-                    _ => PermissionResponse::Default,
-                }
+                PermissionResponse::Default
             } else {
                 PermissionResponse::Deny
             };

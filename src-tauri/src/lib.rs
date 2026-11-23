@@ -3,6 +3,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
+use tauri_plugin_updater::UpdaterExt;
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -12,6 +13,48 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+fn spawn_update_check(app: &tauri::AppHandle) {
+    let app = app.clone();
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = check_and_install_update(app).await {
+            eprintln!("Voxly updater: {error}");
+        }
+    });
+}
+
+async fn check_and_install_update(
+    app: tauri::AppHandle,
+) -> tauri_plugin_updater::Result<()> {
+    let updater = app.updater()?;
+
+    let Some(update) = updater.check().await? else {
+        return Ok(());
+    };
+
+    println!(
+        "Voxly update available: {} -> {}",
+        update.current_version, update.version
+    );
+
+    update
+        .download_and_install(
+            |chunk_length, content_length| {
+                println!(
+                    "Voxly update download: +{chunk_length} bytes (total: {content_length:?})"
+                );
+            },
+            || println!("Voxly update download finished"),
+        )
+        .await?;
+
+    // On Windows, installing an NSIS update closes the running process.
+    // restart() relaunches the newly installed version.
+    app.restart();
+
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         // Register this first so a second launch focuses the existing window.
@@ -19,12 +62,20 @@ pub fn run() {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let open_item =
                 MenuItem::with_id(app, "open", "Open Voxly", true, None::<&str>)?;
+            let updates_item = MenuItem::with_id(
+                app,
+                "check_updates",
+                "Check for Updates",
+                true,
+                None::<&str>,
+            )?;
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit Voxly", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&open_item, &updates_item, &quit_item])?;
 
             let icon = app
                 .default_window_icon()
@@ -38,6 +89,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_main_window(app),
+                    "check_updates" => spawn_update_check(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -52,6 +104,10 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Check at launch in the background. Network/update failures do not
+            // prevent Voxly from opening; users can also check from the tray.
+            spawn_update_check(app.handle());
 
             Ok(())
         })

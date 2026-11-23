@@ -1,6 +1,6 @@
 [package]
 name = "voxly-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "Voxly desktop client"
 authors = ["Voxly"]
 edition = "2021"

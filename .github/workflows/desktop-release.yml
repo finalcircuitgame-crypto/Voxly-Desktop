@@ -49,15 +49,23 @@ jobs:
           $tauriConfig = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
           $cargo = Get-Content "src-tauri/Cargo.toml" -Raw
           $package = Get-Content "package.json" -Raw | ConvertFrom-Json
-          $version = $package.version
-          $cargoVersionPattern = '(?m)^version = "' + [regex]::Escape($version) + '"$'
+          $packageVersion = [string]$package.version
+          $tauriVersion = [string]$tauriConfig.version
+          $cargoVersionMatch = [regex]::Match($cargo, '(?m)^\s*version\s*=\s*"([^"]+)"\s*$')
+          $cargoVersion = $cargoVersionMatch.Groups[1].Value
 
-          if ($tauriConfig.version -ne $version -or $cargo -notmatch $cargoVersionPattern) {
+          Write-Host "package.json version: [$packageVersion]"
+          Write-Host "Cargo.toml version: [$cargoVersion]"
+          Write-Host "tauri.conf.json version: [$tauriVersion]"
+
+          if ([string]::IsNullOrWhiteSpace($cargoVersion) -or
+              $packageVersion -ne $tauriVersion -or
+              $packageVersion -ne $cargoVersion) {
             throw "package.json, src-tauri/Cargo.toml, and tauri.conf.json must use the same version."
           }
 
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "release_tag=v$version" >> $env:GITHUB_OUTPUT
+          "version=$packageVersion" >> $env:GITHUB_OUTPUT
+          "release_tag=v$packageVersion" >> $env:GITHUB_OUTPUT
 
       - name: Build signed updater artifacts
         env:

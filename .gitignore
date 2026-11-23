@@ -1,0 +1,19 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Rust / Tauri
+/target/
+/src-tauri/target/
+**/*.rs.bk
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,14 @@
+{
+  "name": "voxly-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voxly desktop client for Windows, powered by Tauri 2.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build --bundles nsis",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

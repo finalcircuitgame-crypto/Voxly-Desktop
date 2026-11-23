@@ -20,6 +20,19 @@ fn set_unread_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn send_desktop_notification(
+    app: tauri::AppHandle,
+    title: String,
+    body: Option<String>,
+) -> Result<(), String> {
+    let mut builder = app.notification().builder().title(title);
+    if let Some(body) = body {
+        builder = builder.body(body);
+    }
+    builder.show().map_err(|error| error.to_string())
+}
+
 fn open_route(app: &tauri::AppHandle, route: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let target = format!("https://voxly-vc.vercel.app{}", route);
@@ -222,7 +235,7 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![set_unread_count])
+        .invoke_handler(tauri::generate_handler![set_unread_count, send_desktop_notification])
         .run(tauri::generate_context!())
         .expect("error while running Voxly Desktop");
 }

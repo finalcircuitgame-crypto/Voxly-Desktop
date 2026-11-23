@@ -2,8 +2,14 @@ name: Desktop release
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches:
+      - main
+    paths:
+      - ".github/workflows/desktop-release.yml"
+      - "package.json"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/tauri.conf.json"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -33,23 +39,25 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Install Tauri CLI
+      - name: Install dependencies
         run: npm install --no-audit --no-fund
 
       - name: Validate release version
+        id: version
         shell: pwsh
         run: |
-          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
           $tauriConfig = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
           $cargo = Get-Content "src-tauri/Cargo.toml" -Raw
           $package = Get-Content "package.json" -Raw | ConvertFrom-Json
-          if ($tauriConfig.version -ne $tagVersion) {
-            throw "Tag version $tagVersion does not match tauri.conf.json version $($tauriConfig.version)."
+          $version = $package.version
+          $cargoVersionPattern = '(?m)^version = "' + [regex]::Escape($version) + '"$'
+
+          if ($tauriConfig.version -ne $version -or $cargo -notmatch $cargoVersionPattern) {
+            throw "package.json, src-tauri/Cargo.toml, and tauri.conf.json must use the same version."
           }
-          $cargoVersionPattern = '(?m)^version = "' + [regex]::Escape($tagVersion) + '"$'
-          if ($package.version -ne $tagVersion -or $cargo -notmatch $cargoVersionPattern) {
-            throw "Release version must match package.json and src-tauri/Cargo.toml."
-          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "release_tag=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Build signed updater artifacts
         env:
@@ -66,6 +74,9 @@ jobs:
           npm run build:release
 
       - name: Generate Tauri updater manifest
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         shell: pwsh
         run: |
           $bundleDirectory = "src-tauri/target/release/bundle/nsis"
@@ -79,13 +90,12 @@ jobs:
             throw "Missing updater signature: $signaturePath"
           }
 
-          $version = $env:GITHUB_REF_NAME -replace '^v', ''
           $signature = (Get-Content -Path $signaturePath -Raw).Trim()
-          $downloadUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$($updateBundle.Name)"
+          $downloadUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/$($updateBundle.Name)"
 
           $manifest = @{
-            version = $version
-            notes = "Voxly Desktop $version"
+            version = $env:RELEASE_VERSION
+            notes = "Voxly Desktop $env:RELEASE_VERSION"
             pub_date = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
             platforms = @{
               "windows-x86_64" = @{
@@ -102,11 +112,14 @@ jobs:
           "Manifest URL: $downloadUrl"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.version.outputs.release_tag }}
+          target_commitish: main
+          name: Voxly Desktop ${{ steps.version.outputs.version }}
           generate_release_notes: true
           make_latest: true
+          fail_on_unmatched_files: true
           files: |
             src-tauri/target/release/bundle/nsis/*-setup.exe
             src-tauri/target/release/bundle/nsis/*-setup.exe.sig

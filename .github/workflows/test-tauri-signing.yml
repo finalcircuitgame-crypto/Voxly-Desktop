@@ -1,0 +1,68 @@
+name: Test Tauri updater signing key
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-tauri-signing.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-signing-key:
+    name: Validate updater signing secrets
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Tauri CLI
+        run: npm install --no-save --no-audit --no-fund @tauri-apps/cli@latest
+
+      - name: Test private key and password
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "TAURI_SIGNING_PRIVATE_KEY is missing or empty."
+          }
+
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) {
+            throw "TAURI_SIGNING_PRIVATE_KEY_PASSWORD is missing or empty."
+          }
+
+          $testFile = Join-Path $env:RUNNER_TEMP "tauri-signing-key-test.txt"
+          $signatureFile = "$testFile.sig"
+
+          try {
+            [System.IO.File]::WriteAllText($testFile, "Voxly Tauri signing-key validation")
+
+            # The CLI reads both values from the environment. It will fail if
+            # the key cannot be decoded or the password does not unlock it.
+            npx tauri signer sign $testFile
+            if ($LASTEXITCODE -ne 0) {
+              throw "Tauri could not sign the test file. Check that the private-key and password secrets belong together."
+            }
+
+            if (-not (Test-Path $signatureFile) -or
+                (Get-Item $signatureFile).Length -eq 0) {
+              throw "Tauri returned success but did not create a signature file."
+            }
+
+            Write-Host "SUCCESS: Tauri accepted the private key and password and created a test signature."
+          }
+          finally {
+            Remove-Item $testFile, $signatureFile -Force -ErrorAction SilentlyContinue
+          }

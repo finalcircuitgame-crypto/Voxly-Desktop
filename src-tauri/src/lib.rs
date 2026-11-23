@@ -40,7 +40,11 @@ fn spawn_update_check(app: &tauri::AppHandle, notify_if_current: bool) {
         if let Err(error) = check_and_install_update(app.clone(), notify_if_current).await {
             eprintln!("Voxly updater: {error}");
             if notify_if_current {
-                notify(&app, "Voxly update check failed", &format!("Could not check for updates: {error}"));
+                show_update_dialog(
+                    &app,
+                    "Voxly update check failed",
+                    &format!("Could not check for updates: {error}"),
+                );
             }
         }
     });

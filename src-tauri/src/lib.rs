@@ -4,6 +4,7 @@ use tauri::{
     Manager, WindowEvent,
 };
 use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -14,8 +15,22 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+fn show_update_dialog(app: &tauri::AppHandle, title: &str, body: &str) {
+    app.dialog()
+        .message(body)
+        .title(title)
+        .show(|_| {});
+}
+
 fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
-    let _ = app.notification().builder().title(title).body(body).show();
+    if let Err(error) = app.notification().builder().title(title).body(body).show() {
+        eprintln!("Voxly notification failed: {error}");
+        show_update_dialog(
+            app,
+            title,
+            &format!("{body}\n\nWindows notification error: {error}"),
+        );
+    }
 }
 
 fn spawn_update_check(app: &tauri::AppHandle, notify_if_current: bool) {
@@ -39,7 +54,7 @@ async fn check_and_install_update(
 
     let Some(update) = updater.check().await? else {
         if notify_if_current {
-            notify(&app, "Voxly is up to date", "You're running the latest available version.");
+            show_update_dialog(&app, "Voxly is up to date", "You're running the latest available version.");
         }
         return Ok(());
     };
@@ -48,7 +63,19 @@ async fn check_and_install_update(
         "Voxly update available: {} -> {}",
         update.current_version, update.version
     );
-    notify(&app, "Voxly update available", &format!("Downloading version {}. Voxly will restart when the update is ready.", update.version));
+    if notify_if_current {
+        show_update_dialog(
+            &app,
+            "Voxly update available",
+            &format!("Downloading version {}. Voxly will restart when the update is ready.", update.version),
+        );
+    } else {
+        notify(
+            &app,
+            "Voxly update available",
+            &format!("Downloading version {}. Voxly will restart when the update is ready.", update.version),
+        );
+    }
 
     update
         .download_and_install(
@@ -70,7 +97,8 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
-        .plugin(tauri_plugin_notification::init())
+         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let open_item =

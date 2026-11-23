@@ -4,6 +4,7 @@ use tauri::{
     Manager, WindowEvent,
 };
 use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_notification::NotificationExt;
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -13,22 +14,33 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
-fn spawn_update_check(app: &tauri::AppHandle) {
+fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
+    let _ = app.notification().builder().title(title).body(body).show();
+}
+
+fn spawn_update_check(app: &tauri::AppHandle, notify_if_current: bool) {
     let app = app.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = check_and_install_update(app).await {
+        if let Err(error) = check_and_install_update(app.clone(), notify_if_current).await {
             eprintln!("Voxly updater: {error}");
+            if notify_if_current {
+                notify(&app, "Voxly update check failed", &format!("Could not check for updates: {error}"));
+            }
         }
     });
 }
 
 async fn check_and_install_update(
     app: tauri::AppHandle,
+    notify_if_current: bool,
 ) -> tauri_plugin_updater::Result<()> {
     let updater = app.updater()?;
 
     let Some(update) = updater.check().await? else {
+        if notify_if_current {
+            notify(&app, "Voxly is up to date", "You're running the latest available version.");
+        }
         return Ok(());
     };
 
@@ -36,6 +48,7 @@ async fn check_and_install_update(
         "Voxly update available: {} -> {}",
         update.current_version, update.version
     );
+    notify(&app, "Voxly update available", &format!("Downloading version {}. Voxly will restart when the update is ready.", update.version));
 
     update
         .download_and_install(
@@ -85,7 +98,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_main_window(app),
-                    "check_updates" => spawn_update_check(app),
+                    "check_updates" => spawn_update_check(app, true),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -103,7 +116,7 @@ pub fn run() {
 
             // Check at launch in the background. Network/update failures do not
             // prevent Voxly from opening; users can also check from the tray.
-            spawn_update_check(app.handle());
+            spawn_update_check(app.handle(), false);
 
             Ok(())
         })

@@ -18,11 +18,13 @@ The Windows desktop client for [Voxly](https://voxly-vc.vercel.app), built with 
 - Installs updates only when they are signed by the updater public key embedded in the app.
 - Builds a per-user Windows NSIS installer.
 
-## Version 0.1.4
+## Version 0.1.5
 
 - **Reload Voxly:** reload the desktop web view directly from the system-tray menu.
 - **Send Test Notification:** send a native Windows notification from the tray to quickly verify notification delivery.
-- Settings test alerts and realtime desktop alerts now use the same native Rust notification handler as the tray test.
+- Settings test alerts and realtime desktop alerts use the same native Rust notification handler as the tray test.
+- Use the native window visibility state when deciding whether background alerts should appear; tray-hidden notifications no longer depend on WebView document visibility.
+- Explicitly handle WebView2 microphone and camera permission requests for the official Voxly production origin.
 
 The desktop integration subscribes to Voxly's existing Supabase realtime events while the app is running. Group unread counts are stored locally on this Windows device because the current group-message schema has no server-side read receipts. The first milestone uses the deployed web UI, so an internet connection is required. The desktop shell is native; the current interface and application backend remain served by the existing Voxly deployment.
 
@@ -70,7 +72,7 @@ Create these repository Actions secrets under **Settings → Secrets and variabl
 
 The release workflow validates that `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` use the same version. Updating the version on `main` triggers the signed Windows build and publishes a matching GitHub Release with a `latest.json` manifest.
 
-The first updater-enabled installer must be installed manually over earlier pre-updater builds. Existing 0.1.0 installations do not contain the public key and cannot securely self-update. Install the first signed release (0.1.3) once; later releases, including 0.1.4, can update automatically.
+The first updater-enabled installer must be installed manually over earlier pre-updater builds. Existing 0.1.0 installations do not contain the public key and cannot securely self-update. Install the first signed release (0.1.3) once; later releases, including 0.1.5, can update automatically.
 
 ## CI
 

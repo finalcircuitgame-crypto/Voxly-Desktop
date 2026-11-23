@@ -1,6 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    webview::{PermissionKind, PermissionResponse},
     Manager, WindowEvent,
 };
 use tauri_plugin_updater::UpdaterExt;
@@ -20,17 +21,37 @@ fn set_unread_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
     Ok(())
 }
 
+fn main_window_is_visible(app: &tauri::AppHandle) -> bool {
+    app.get_webview_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(true)
+}
+
+#[tauri::command]
+fn is_main_window_visible(app: tauri::AppHandle) -> bool {
+    main_window_is_visible(&app)
+}
+
 #[tauri::command]
 fn send_desktop_notification(
     app: tauri::AppHandle,
     title: String,
     body: Option<String>,
-) -> Result<(), String> {
+    only_if_hidden: Option<bool>,
+) -> Result<bool, String> {
+    // Visibility must come from the native window: a Tauri window hidden to
+    // the tray can still report document.visibilityState as "visible".
+    if only_if_hidden.unwrap_or(false) && main_window_is_visible(&app) {
+        return Ok(false);
+    }
+
     let mut builder = app.notification().builder().title(title);
     if let Some(body) = body {
         builder = builder.body(body);
     }
-    builder.show().map_err(|error| error.to_string())
+    builder.show()
+        .map(|_| true)
+        .map_err(|error| error.to_string())
 }
 
 fn open_route(app: &tauri::AppHandle, route: &str) {
@@ -141,6 +162,30 @@ async fn check_and_install_update(
 
 pub fn run() {
     tauri::Builder::default()
+        // Windows WebView2 requires the host app to decide media-capture
+        // permissions. Only trust the production Voxly origin.
+        .on_permission_request(|webview, kind| {
+            let trusted_origin = webview.url().map(|url| {
+                url.scheme() == "https"
+                    && url.host_str() == Some("voxly-vc.vercel.app")
+                    && url.port().is_none()
+            }).unwrap_or(false);
+
+            let response = if trusted_origin {
+                match kind {
+                    PermissionKind::Microphone | PermissionKind::Camera => PermissionResponse::Allow,
+                    _ => PermissionResponse::Default,
+                }
+            } else {
+                PermissionResponse::Deny
+            };
+
+            eprintln!(
+                "[Voxly permissions] {:?} request from trusted_origin={}: {:?}",
+                kind, trusted_origin, response
+            );
+            response
+        })
         // Register this first so a second launch focuses the existing window.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
@@ -235,7 +280,7 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![set_unread_count, send_desktop_notification])
+        .invoke_handler(tauri::generate_handler![set_unread_count, is_main_window_visible, send_desktop_notification])
         .run(tauri::generate_context!())
         .expect("error while running Voxly Desktop");
 }

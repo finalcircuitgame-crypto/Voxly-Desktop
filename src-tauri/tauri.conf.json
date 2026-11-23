@@ -47,7 +47,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBN0M1QjhGRTg2REQyMzYKUldRMjBtM29qMXQ4ZW4xbVdxRThRNFVqTUR3VGFHYVdYNStlY0d0blpxaWdNeENZcTlXbExwSXMK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGODc3RjMzNzQwQzM2MUUKUldRZU5neDBNMytIbjk0MFFUV2NpYzViYWF3N3NQenVTTkpKR2src0pDaTlPM1ByNXA4SjI0NmkK",
       "endpoints": [
         "https://github.com/finalcircuitgame-crypto/Voxly-Desktop/releases/latest/download/latest.json"
       ],

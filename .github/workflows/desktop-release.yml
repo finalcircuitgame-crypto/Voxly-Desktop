@@ -46,7 +46,8 @@ jobs:
           if ($tauriConfig.version -ne $tagVersion) {
             throw "Tag version $tagVersion does not match tauri.conf.json version $($tauriConfig.version)."
           }
-          if ($package.version -ne $tagVersion -or $cargo -notmatch "(?m)^version = \"$([regex]::Escape($tagVersion))\"$") {
+          $cargoVersionPattern = '(?m)^version = "' + [regex]::Escape($tagVersion) + '"$'
+          if ($package.version -ne $tagVersion -or $cargo -notmatch $cargoVersionPattern) {
             throw "Release version must match package.json and src-tauri/Cargo.toml."
           }
 

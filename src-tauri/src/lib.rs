@@ -7,6 +7,30 @@ use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 
+struct UnreadMenuItem(MenuItem<tauri::Wry>);
+
+#[tauri::command]
+fn set_unread_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
+    let label = if count == 0 { "Unread: 0".to_string() } else { format!("Unread: {}", count.min(999)) };
+    app.state::<UnreadMenuItem>().0.set_text(&label).map_err(|error| error.to_string())?;
+    if let Some(tray) = app.tray_by_id("main") {
+        let tooltip = if count == 0 { "Voxly".to_string() } else { format!("Voxly — {} unread", count) };
+        tray.set_tooltip(Some(tooltip)).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn open_route(app: &tauri::AppHandle, route: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let target = format!("https://voxly-vc.vercel.app{}", route);
+        let script = format!("window.location.assign({})", serde_json::to_string(&target).unwrap());
+        let _ = window.eval(&script);
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -114,22 +138,30 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
+            let messages_item = MenuItem::with_id(app, "messages", "Open Messages", true, None::<&str>)?;
+            let calls_item = MenuItem::with_id(app, "calls", "Open Calls", true, None::<&str>)?;
+            let groups_item = MenuItem::with_id(app, "groups", "Open Groups", true, None::<&str>)?;
+            let unread_item = MenuItem::with_id(app, "unread_count", "Unread: 0", false, None::<&str>)?;
+            app.manage(UnreadMenuItem(unread_item.clone()));
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit Voxly", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_item, &updates_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&open_item, &messages_item, &calls_item, &groups_item, &unread_item, &updates_item, &quit_item])?;
 
             let icon = app
                 .default_window_icon()
                 .expect("Voxly application icon is configured")
                 .clone();
 
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main")
                 .icon(icon)
                 .menu(&menu)
                 .tooltip("Voxly")
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_main_window(app),
+                    "messages" => open_route(app, "/chat"),
+                    "calls" => open_route(app, "/call"),
+                    "groups" => open_route(app, "/dashboard?view=groups"),
                     "check_updates" => spawn_update_check(app, true),
                     "quit" => app.exit(0),
                     _ => {}
@@ -159,6 +191,7 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
+        .invoke_handler(tauri::generate_handler![set_unread_count])
         .run(tauri::generate_context!())
         .expect("error while running Voxly Desktop");
 }

@@ -8,7 +8,7 @@ The Windows desktop client for [Voxly](https://voxly-vc.vercel.app), built with 
 - Reuses the existing Supabase authentication, data, calls, and web backend. There is no second account system or duplicated API.
 - Keeps the Voxly window available from the Windows notification area (system tray).
 - Closing the main window hides it to the tray; it does not terminate the app.
-- The tray menu includes **Open Voxly**, **Open Messages**, **Open Calls**, **Open Groups**, **Check for Updates**, and **Quit Voxly**.
+- The tray menu includes **Open Voxly**, **Open Messages**, **Open Calls**, **Open Groups**, **Reload Voxly**, **Send Test Notification**, **Check for Updates**, and **Quit Voxly**.
 - The tray menu and tooltip show the current unread-message count, refreshed by the authenticated Voxly web client.
 - Native Windows notifications cover incoming direct messages, group messages, one-to-one calls, and group calls while the desktop app is running in the tray.
 - A tray click restores and focuses the main window.
@@ -17,6 +17,11 @@ The Windows desktop client for [Voxly](https://voxly-vc.vercel.app), built with 
 - Checks for signed updates in the background at startup; update checks can also be started from the tray menu.
 - Installs updates only when they are signed by the updater public key embedded in the app.
 - Builds a per-user Windows NSIS installer.
+
+## Version 0.1.3
+
+- **Reload Voxly:** reload the desktop web view directly from the system-tray menu.
+- **Send Test Notification:** send a native Windows notification from the tray to quickly verify notification delivery.
 
 The desktop integration subscribes to Voxly's existing Supabase realtime events while the app is running. Group unread counts are stored locally on this Windows device because the current group-message schema has no server-side read receipts. The first milestone uses the deployed web UI, so an internet connection is required. The desktop shell is native; the current interface and application backend remain served by the existing Voxly deployment.
 
@@ -62,13 +67,13 @@ Create these repository Actions secrets under **Settings → Secrets and variabl
 - `TAURI_SIGNING_PRIVATE_KEY`: the complete contents of your local `voxly.key` file.
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the password used when generating that key.
 
-Create a version tag matching the version in both `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` (for example, `v0.1.1`). The `Desktop release` workflow builds the signed NSIS updater bundle and publishes it with a `latest.json` manifest to GitHub Releases.
+The release workflow validates that `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` use the same version. Updating the version on `main` triggers the signed Windows build and publishes a matching GitHub Release with a `latest.json` manifest.
 
-The first updater-enabled installer must be installed manually over earlier pre-updater builds. Existing 0.1.0 installations do not contain the public key and cannot securely self-update. Install the first signed release (0.1.2) once; later releases can update automatically.
+The first updater-enabled installer must be installed manually over earlier pre-updater builds. Existing 0.1.0 installations do not contain the public key and cannot securely self-update. Install the first signed release (0.1.2) once; later releases, including 0.1.3, can update automatically.
 
 ## CI
 
-The GitHub Actions workflow in `.github/workflows/windows-build.yml` validates the Windows installer on pushes, pull requests, and manual runs. It intentionally omits signed updater artifacts; signed artifacts are created only by the tagged release workflow.
+The GitHub Actions workflow in `.github/workflows/windows-build.yml` validates the Windows installer on pushes, pull requests, and manual runs. It intentionally omits signed updater artifacts; signed artifacts are created by the desktop release workflow.
 
 ## Security model
 
@@ -93,6 +98,5 @@ Do not place Supabase service-role keys, LiveKit secrets, Firebase Admin credent
     │   └── main.rs
     ├── build.rs
     ├── Cargo.toml
-    ├── tauri.ci.conf.json
     └── tauri.conf.json
 ```

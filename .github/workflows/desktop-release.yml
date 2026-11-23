@@ -1,0 +1,112 @@
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    name: Build and publish signed Windows update
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Tauri CLI
+        run: npm install --no-audit --no-fund
+
+      - name: Validate release version
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          $tauriConfig = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+          $cargo = Get-Content "src-tauri/Cargo.toml" -Raw
+          $package = Get-Content "package.json" -Raw | ConvertFrom-Json
+          if ($tauriConfig.version -ne $tagVersion) {
+            throw "Tag version $tagVersion does not match tauri.conf.json version $($tauriConfig.version)."
+          }
+          if ($package.version -ne $tagVersion -or $cargo -notmatch "(?m)^version = \"$([regex]::Escape($tagVersion))\"$") {
+            throw "Release version must match package.json and src-tauri/Cargo.toml."
+          }
+
+      - name: Build signed updater artifacts
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secret."
+          }
+          npm run build:release
+
+      - name: Generate Tauri updater manifest
+        shell: pwsh
+        run: |
+          $bundleDirectory = "src-tauri/target/release/bundle/nsis"
+          $updateBundle = Get-ChildItem -Path $bundleDirectory -Filter "*.nsis.zip" | Select-Object -First 1
+          if ($null -eq $updateBundle) {
+            throw "Tauri did not produce a signed NSIS updater .zip bundle."
+          }
+
+          $signaturePath = "$($updateBundle.FullName).sig"
+          if (-not (Test-Path $signaturePath)) {
+            throw "Missing updater signature: $signaturePath"
+          }
+
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $signature = (Get-Content -Path $signaturePath -Raw).Trim()
+          $downloadUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$($updateBundle.Name)"
+
+          $manifest = @{
+            version = $version
+            notes = "Voxly Desktop $version"
+            pub_date = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = $downloadUrl
+              }
+            }
+          } | ConvertTo-Json -Depth 6
+
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText("latest.json", $manifest, $utf8NoBom)
+
+          "Update bundle: $($updateBundle.Name)"
+          "Manifest URL: $downloadUrl"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.nsis.zip
+            latest.json

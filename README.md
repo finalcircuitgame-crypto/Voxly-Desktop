@@ -8,15 +8,17 @@ The Windows desktop client for [Voxly](https://voxly-vc.vercel.app), built with 
 - Reuses the existing Supabase authentication, data, calls, and web backend. There is no second account system or duplicated API.
 - Keeps the Voxly window available from the Windows notification area (system tray).
 - Closing the main window hides it to the tray; it does not terminate the app.
-- The tray menu includes **Open Voxly**, **Check for Updates**, and **Quit Voxly**.
+- The tray menu includes **Open Voxly**, **Open Messages**, **Open Calls**, **Open Groups**, **Check for Updates**, and **Quit Voxly**.
+- The tray menu and tooltip show the current unread-message count, refreshed by the authenticated Voxly web client.
+- Native Windows notifications cover incoming direct messages, group messages, one-to-one calls, and group calls while the desktop app is running in the tray.
 - A tray click restores and focuses the main window.
 - Enforces a single running instance.
-- Registers Tauri's native notification plugin for desktop notification integration.
+- Uses Tauri's native notification plugin with an explicit permission request; notification settings include a test alert.
 - Checks for signed updates in the background at startup; update checks can also be started from the tray menu.
 - Installs updates only when they are signed by the updater public key embedded in the app.
 - Builds a per-user Windows NSIS installer.
 
-The first milestone uses the deployed web UI, so an internet connection is required. The desktop shell is native; the current interface and application backend remain served by the existing Voxly deployment.
+The desktop integration subscribes to Voxly's existing Supabase realtime events while the app is running. Group unread counts are stored locally on this Windows device because the current group-message schema has no server-side read receipts. The first milestone uses the deployed web UI, so an internet connection is required. The desktop shell is native; the current interface and application backend remain served by the existing Voxly deployment.
 
 ## Development requirements
 
@@ -62,7 +64,7 @@ Create these repository Actions secrets under **Settings → Secrets and variabl
 
 Create a version tag matching the version in both `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` (for example, `v0.1.1`). The `Desktop release` workflow builds the signed NSIS updater bundle and publishes it with a `latest.json` manifest to GitHub Releases.
 
-The first updater-enabled installer must be installed manually over earlier pre-updater builds. Existing 0.1.0 installations do not contain the public key and cannot securely self-update. Install the first signed release (0.1.1) once; later releases can update automatically.
+The first updater-enabled installer must be installed manually over earlier pre-updater builds. Existing 0.1.0 installations do not contain the public key and cannot securely self-update. Install the first signed release (0.1.2) once; later releases can update automatically.
 
 ## CI
 

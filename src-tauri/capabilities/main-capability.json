@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "Allow the official Voxly web application to use the desktop window and native notification APIs.",
+  "windows": ["main"],
+  "local": false,
+  "remote": {
+    "urls": ["https://voxly-vc.vercel.app/**"]
+  },
+  "permissions": [
+    "core:default",
+    "notification:default"
+  ]
+}

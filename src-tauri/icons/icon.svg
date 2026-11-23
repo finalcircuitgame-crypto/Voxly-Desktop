@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Voxly V icon">
+  <defs>
+    <linearGradient id="v1-left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <linearGradient id="v1-right" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f43f5e" />
+      <stop offset="100%" stop-color="#9333ea" />
+    </linearGradient>
+    <filter id="v1-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#020617" flood-opacity="0.8" />
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#8b5cf6" flood-opacity="0.4" />
+    </filter>
+  </defs>
+  <g filter="url(#v1-glow)">
+    <polygon points="18,24 31,24 48,65 40,73" fill="url(#v1-left)" />
+    <polygon points="78,24 65,24 48,65 56,73" fill="url(#v1-right)" />
+  </g>
+  <line x1="18.8" y1="24.8" x2="30.2" y2="24.8" stroke="#ffffff" stroke-width="1.3" stroke-opacity="0.8" stroke-linecap="round" />
+  <line x1="65.8" y1="24.8" x2="77.2" y2="24.8" stroke="#ffffff" stroke-width="1.3" stroke-opacity="0.8" stroke-linecap="round" />
+</svg>

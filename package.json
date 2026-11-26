@@ -1,6 +1,6 @@
 {
   "name": "voxly-desktop",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Voxly desktop client for Windows, powered by Tauri 2.",
   "scripts": {

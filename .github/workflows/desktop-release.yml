@@ -134,7 +134,8 @@ jobs:
         shell: pwsh
         run: |
           $manifest = Get-Content -Path "latest.json" -Raw | ConvertFrom-Json
-          $bundleName = [System.IO.Path]::GetFileName([uri]$manifest.platforms.'windows-x86_64'.url)
+          $sourceUrl = [uri]([string]$manifest.platforms.'windows-x86_64'.url)
+          $bundleName = [System.IO.Path]::GetFileName($sourceUrl.AbsolutePath)
           $crossReleaseTag = "desktop-v$env:RELEASE_VERSION"
           $manifest.platforms.'windows-x86_64'.url = "https://github.com/finalcircuitgame-crypto/Voxly-Releases/releases/download/$crossReleaseTag/$bundleName"
 

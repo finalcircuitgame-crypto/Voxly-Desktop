@@ -13,36 +13,74 @@ pub fn get_foreground_game() -> Option<String> {
 
     unsafe {
         let window = GetForegroundWindow();
-        if window.is_null() {
+        if !window.is_null() {
+            let mut process_id = 0u32;
+            if GetWindowThreadProcessId(window, &mut process_id) != 0 && process_id != 0 {
+                let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
+                if !process.is_null() {
+                    let mut buffer = [0u16; 1024];
+                    let mut length = buffer.len() as u32;
+                    let success = QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut length);
+                    CloseHandle(process);
+
+                    if success != 0 && length > 0 {
+                        let path = std::ffi::OsString::from_wide(&buffer[..length as usize]);
+                        let executable = Path::new(&path)
+                            .file_name()
+                            .and_then(|name| name.to_str())?
+                            .to_ascii_lowercase();
+                        if let Some(game) = game_name(&executable) {
+                            return Some(game.to_owned());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Keep activity alive when the player switches back to Voxly or another
+    // window while the game remains running in the background.
+    get_running_game()
+}
+
+#[cfg(windows)]
+fn get_running_game() -> Option<String> {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == INVALID_HANDLE_VALUE {
             return None;
         }
 
-        let mut process_id = 0u32;
-        if GetWindowThreadProcessId(window, &mut process_id) == 0 || process_id == 0 {
-            return None;
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut found = None;
+
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                let length = entry.szExeFile.iter().position(|unit| *unit == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let executable = String::from_utf16_lossy(&entry.szExeFile[..length])
+                    .to_ascii_lowercase();
+
+                if let Some(game) = game_name(&executable) {
+                    found = Some(game.to_owned());
+                    break;
+                }
+
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
         }
 
-        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
-        if process.is_null() {
-            return None;
-        }
-
-        let mut buffer = [0u16; 1024];
-        let mut length = buffer.len() as u32;
-        let success = QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut length);
-        CloseHandle(process);
-
-        if success == 0 || length == 0 {
-            return None;
-        }
-
-        let path = std::ffi::OsString::from_wide(&buffer[..length as usize]);
-        let executable = Path::new(&path)
-            .file_name()
-            .and_then(|name| name.to_str())?
-            .to_ascii_lowercase();
-
-        game_name(&executable).map(str::to_owned)
+        CloseHandle(snapshot);
+        found
     }
 }
 
@@ -84,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn leaves_roblox_to_the_sdk() {
+    fn recognizes_roblox_for_sdk_fallback() {
         assert_eq!(game_name("robloxplayerbeta.exe"), Some("Roblox"));
     }
 

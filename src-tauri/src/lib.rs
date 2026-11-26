@@ -1,3 +1,6 @@
+mod game_detection;
+
+use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -9,6 +12,33 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 
 struct UnreadMenuItem(MenuItem<tauri::Wry>);
+struct GameMenuItem(MenuItem<tauri::Wry>);
+
+#[tauri::command]
+fn get_foreground_game() -> Option<String> {
+    game_detection::get_foreground_game()
+}
+
+fn spawn_game_detection(app: &tauri::AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut last_game: Option<String> = None;
+        loop {
+            let game = game_detection::get_foreground_game();
+            if game != last_game {
+                let label = game
+                    .as_ref()
+                    .map(|name| format!("🎮 Playing: {name}"))
+                    .unwrap_or_else(|| "Playing: Not detected".to_string());
+                if let Some(item) = app.try_state::<GameMenuItem>() {
+                    let _ = item.0.set_text(&label);
+                }
+                last_game = game;
+            }
+            std::thread::sleep(Duration::from_secs(2));
+        }
+    });
+}
 
 #[tauri::command]
 fn set_unread_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
@@ -97,7 +127,9 @@ fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
         show_update_dialog(
             app,
             title,
-            &format!("{body}\n\nWindows notification error: {error}"),
+            &format!("{body}
+
+Windows notification error: {error}"),
         );
     }
 }
@@ -204,6 +236,7 @@ pub fn run() {
             let calls_item = MenuItem::with_id(app, "calls", "Open Calls", true, None::<&str>)?;
             let groups_item = MenuItem::with_id(app, "groups", "Open Groups", true, None::<&str>)?;
             let unread_item = MenuItem::with_id(app, "unread_count", "Unread: 0", false, None::<&str>)?;
+            let game_item = MenuItem::with_id(app, "game_activity", "Playing: Not detected", false, None::<&str>)?;
             let reload_item = MenuItem::with_id(app, "reload", "Reload Voxly", true, None::<&str>)?;
             let test_notification_item = MenuItem::with_id(
                 app,
@@ -220,6 +253,7 @@ pub fn run() {
                 None::<&str>,
             )?;
             app.manage(UnreadMenuItem(unread_item.clone()));
+            app.manage(GameMenuItem(game_item.clone()));
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit Voxly", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[
@@ -228,6 +262,7 @@ pub fn run() {
                 &calls_item,
                 &groups_item,
                 &unread_item,
+                &game_item,
                 &reload_item,
                 &test_notification_item,
                 &updates_item,
@@ -274,6 +309,7 @@ pub fn run() {
             // Check at launch in the background. Network/update failures do not
             // prevent Voxly from opening; users can also check from the tray.
             spawn_update_check(app.handle(), false);
+            spawn_game_detection(app.handle());
 
             Ok(())
         })
@@ -284,7 +320,7 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![set_unread_count, is_main_window_visible, send_desktop_notification])
+        .invoke_handler(tauri::generate_handler![set_unread_count, is_main_window_visible, send_desktop_notification, get_foreground_game])
         .run(tauri::generate_context!())
         .expect("error while running Voxly Desktop");
 }

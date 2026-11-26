@@ -147,6 +147,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          overwrite_files: true
           tag_name: ${{ steps.version.outputs.release_tag }}
           target_commitish: main
           name: Voxly Desktop ${{ steps.version.outputs.version }}

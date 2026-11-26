@@ -55,7 +55,7 @@ fn game_name(executable: &str) -> Option<&'static str> {
     match executable {
         // Roblox is intentionally left to the Voxly Roblox SDK, which can
         // provide richer experience-specific details than process detection.
-        "robloxplayerbeta.exe" | "robloxplayerlauncher.exe" => None,
+        "robloxplayerbeta.exe" | "robloxplayerlauncher.exe" => Some("Roblox"),
 
         // Call of Duty HQ / Warzone / recent releases.
         "cod.exe" | "cod22-cod.exe" | "cod23-cod.exe" | "cod24-cod.exe"
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn leaves_roblox_to_the_sdk() {
-        assert_eq!(game_name("robloxplayerbeta.exe"), None);
+        assert_eq!(game_name("robloxplayerbeta.exe"), Some("Roblox"));
     }
 
     #[test]

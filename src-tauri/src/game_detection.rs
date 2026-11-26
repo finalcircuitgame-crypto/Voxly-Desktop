@@ -53,8 +53,8 @@ pub fn get_foreground_game() -> Option<String> {
 
 fn game_name(executable: &str) -> Option<&'static str> {
     match executable {
-        // Roblox is intentionally left to the Voxly Roblox SDK, which can
-        // provide richer experience-specific details than process detection.
+        // Roblox is recognized as a fallback; the backend preserves richer SDK
+        // activity whenever the Roblox integration is actively publishing.
         "robloxplayerbeta.exe" | "robloxplayerlauncher.exe" => Some("Roblox"),
 
         // Call of Duty HQ / Warzone / recent releases.

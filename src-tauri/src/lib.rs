@@ -127,7 +127,9 @@ fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
         show_update_dialog(
             app,
             title,
-            &format!("{body}\n\nWindows notification error: {error}"),
+            &format!("{body}
+
+Windows notification error: {error}"),
         );
     }
 }
@@ -233,7 +235,8 @@ pub fn run() {
             let messages_item = MenuItem::with_id(app, "messages", "Open Messages", true, None::<&str>)?;
             let calls_item = MenuItem::with_id(app, "calls", "Open Calls", true, None::<&str>)?;
             let groups_item = MenuItem::with_id(app, "groups", "Open Groups", true, None::<&str>)?;
-            let unread_item = MenuItem::with_id(app, "unread_count", "Unread: 0", false, None::<&str>)?;\n            let game_item = MenuItem::with_id(app, "game_activity", "Playing: Not detected", false, None::<&str>)?;
+            let unread_item = MenuItem::with_id(app, "unread_count", "Unread: 0", false, None::<&str>)?;
+            let game_item = MenuItem::with_id(app, "game_activity", "Playing: Not detected", false, None::<&str>)?;
             let reload_item = MenuItem::with_id(app, "reload", "Reload Voxly", true, None::<&str>)?;
             let test_notification_item = MenuItem::with_id(
                 app,
@@ -249,7 +252,8 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
-            app.manage(UnreadMenuItem(unread_item.clone()));\n            app.manage(GameMenuItem(game_item.clone()));
+            app.manage(UnreadMenuItem(unread_item.clone()));
+            app.manage(GameMenuItem(game_item.clone()));
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit Voxly", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[
@@ -258,6 +262,7 @@ pub fn run() {
                 &calls_item,
                 &groups_item,
                 &unread_item,
+                &game_item,
                 &reload_item,
                 &test_notification_item,
                 &updates_item,
@@ -303,7 +308,8 @@ pub fn run() {
 
             // Check at launch in the background. Network/update failures do not
             // prevent Voxly from opening; users can also check from the tray.
-            spawn_update_check(app.handle(), false);\n            spawn_game_detection(app.handle());
+            spawn_update_check(app.handle(), false);
+            spawn_game_detection(app.handle());
 
             Ok(())
         })
